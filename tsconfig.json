@@ -1,0 +1,42 @@
+{
+	"compilerOptions": {
+		"strict": true,
+		"target": "ESNext",
+		"lib": ["DOM", "DOM.Iterable", "ESNext"],
+		"jsx": "react-jsx",
+		"experimentalDecorators": false,
+		"useDefineForClassFields": true,
+		"module": "ESNext",
+		"moduleResolution": "node",
+		"resolveJsonModule": true,
+		"baseUrl": ".",
+		"paths": {
+			"~src/*": ["src/*"]
+		},
+		"allowJs": false,
+		"allowImportingTsExtensions": true,
+		"checkJs": false,
+		"removeComments": true,
+		"stripInternal": true,
+		"isolatedModules": true,
+		"allowSyntheticDefaultImports": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"skipLibCheck": true,
+		"skipDefaultLibCheck": true,
+		"noImplicitAny": false,
+		"noImplicitThis": true,
+		"strictBindCallApply": true,
+		"strictNullChecks": true,
+		"strictPropertyInitialization": true,
+		"useUnknownInCatchVariables": true,
+		"exactOptionalPropertyTypes": true,
+		"noImplicitReturns": true,
+		"noUncheckedIndexedAccess": true,
+		"noImplicitOverride": true,
+		"noEmit": true
+	},
+	"include": ["src"],
+	"references": [{ "path": "./tsconfig.node.json" }],
+	"exclude": ["node_modules"]
+}

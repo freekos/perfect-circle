@@ -1,0 +1,61 @@
+{
+	"name": "perfect_circle",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite --port=8000 --host",
+		"build": "tsc && vite build",
+		"preview": "vite preview --port=8080 --host",
+		"lint:commit": "commitlint -e $GIT_PARAMS",
+		"lint:style": "stylelint '**/*.module.scss' '**/*.scss' '**/*.css'",
+		"lint": "npm run lint:commit && npm run lint:style"
+	},
+	"husky": {
+		"hooks": {
+			"pre-commit": "lint-staged"
+		}
+	},
+	"lint-staged": {
+		"*.{js,jsx,json,md,html,css,scss,yml}": [
+			"p lint",
+			"prettier --write",
+			"eslint --fix",
+			"stylelint --fix",
+			"git add"
+		]
+	},
+	"dependencies": {
+		"react": "^18.2.0",
+		"react-dom": "^18.2.0",
+		"sass": "^1.62.0"
+	},
+	"devDependencies": {
+		"@commitlint/cli": "^17.6.1",
+		"@commitlint/config-conventional": "^17.6.1",
+		"@trivago/prettier-plugin-sort-imports": "^4.1.1",
+		"@types/react": "^18.0.28",
+		"@types/react-dom": "^18.0.11",
+		"@typescript-eslint/eslint-plugin": "^5.59.0",
+		"@typescript-eslint/parser": "^5.59.0",
+		"@vitejs/plugin-react-swc": "^3.0.0",
+		"eslint": "^8.38.0",
+		"eslint-config-prettier": "^8.8.0",
+		"eslint-plugin-jsx-a11y": "^6.7.1",
+		"eslint-plugin-prettier": "^4.2.1",
+		"eslint-plugin-react": "^7.32.2",
+		"eslint-plugin-react-hooks": "^4.6.0",
+		"eslint-plugin-react-refresh": "^0.3.4",
+		"husky": "^8.0.3",
+		"lint-staged": "^13.2.1",
+		"prettier": "^2.8.7",
+		"stylelint": "^15.5.0",
+		"stylelint-config-standard": "^33.0.0",
+		"stylelint-scss": "^4.6.0",
+		"typescript": "^5.0.2",
+		"vite": "^4.3.0",
+		"vite-plugin-checker": "^0.5.6",
+		"vite-plugin-pwa": "^0.14.7",
+		"vite-tsconfig-paths": "^4.2.0"
+	}
+}
