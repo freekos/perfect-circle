@@ -1,0 +1,17 @@
+@import './styles/index.scss';
+
+@font-face {
+	font-family: 'DotGothic16Regular';
+	src: local('DotGothic16Regular'), url('../shared/assets/fonts/DotGothic16-Regular.ttf') format('truetype');
+}
+
+body {
+	background: var(--background-color);
+	font-family: var(--font-family);
+	font-size: var(--font-size);
+	color: var(--text-color);
+}
+
+.app {
+	height: 100%;
+}

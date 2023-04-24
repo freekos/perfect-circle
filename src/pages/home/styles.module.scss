@@ -1,0 +1,101 @@
+.page {
+	display: flex;
+	flex-direction: column;
+	min-height: 100vh;
+
+	overflow: hidden;
+
+	background: var(--background-color);
+	font-family: var(--font-family);
+	font-size: var(--font-size);
+	color: var(--text-color);
+}
+
+.container {
+	flex-grow: 1;
+	width: 100%;
+	max-width: 1230px;
+
+	margin: 0 auto;
+}
+
+.section {
+	display: flex;
+	flex-direction: column;
+	flex-grow: 1;
+	min-height: 0;
+
+	position: relative;
+}
+
+.section__canvas {
+	width: 100vw;
+	height: 100vh;
+
+	cursor: crosshair;
+
+	/* z-index: 2; */
+
+	&__circle {
+		fill: var(--text-color);
+	}
+}
+
+.section__info {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+
+	position: absolute;
+	top: 0;
+	left: 0;
+	/* z-index: 1; */
+	height: 100%;
+	width: 100%;
+
+	pointer-events: none;
+
+	animation: fadein 1s ease-in-out forwards;
+
+	&__content {
+		user-select: none;
+		margin-bottom: 2.66rem;
+
+		span {
+			display: inline-block;
+
+			font-family: DotGothic16Regular;
+		}
+
+		span:nth-child(1) {
+			width: 0rem;
+		}
+		span:nth-child(4) {
+			font-weight: 700;
+			width: 2rem;
+		}
+
+		&--large {
+			font-size: 4rem;
+			font-weight: bold;
+		}
+
+		&--medium {
+			font-size: 3.5rem;
+			font-weight: bold;
+		}
+	}
+}
+
+@keyframes fadein {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@media (max-width: 768px) {
+}
