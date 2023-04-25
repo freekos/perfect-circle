@@ -48,10 +48,12 @@ function Section() {
 			</div>
 			<svg
 				className={cn(styles.section__canvas)}
-				onMouseDown={(event) => onIsDrawingChange({ value: true, position: { x: event.clientX, y: event.clientY } })}
-				onMouseMove={(event) => onPositionsChange({ x: event.clientX, y: event.clientY })}
-				onMouseUp={(event) => onIsDrawingChange({ value: false, position: { x: event.clientX, y: event.clientY } })}
-				onMouseLeave={(event) => onIsDrawingChange({ value: false, position: { x: event.clientX, y: event.clientY } })}
+				onPointerDown={(event) => onIsDrawingChange({ value: true, position: { x: event.clientX, y: event.clientY } })}
+				onPointerMove={(event) => onPositionsChange({ x: event.clientX, y: event.clientY })}
+				onPointerUp={(event) => onIsDrawingChange({ value: false, position: { x: event.clientX, y: event.clientY } })}
+				onPointerLeave={(event) =>
+					onIsDrawingChange({ value: false, position: { x: event.clientX, y: event.clientY } })
+				}
 			>
 				<g>
 					<circle className={styles.section__canvas__circle} cx='50%' cy='50%' r={model.CENTER_CIRCLE_RADIUS} />
