@@ -52,13 +52,27 @@ function Section() {
 				</div>
 			</div>
 			<svg
+				onTouchStart={(event) => {
+					const touch = event.touches[0]!
+					onIsDrawingChange({ value: true, position: { x: touch.clientX, y: touch.clientY } })
+				}}
+				onTouchMove={(event) => {
+					const touch = event.touches[0]!
+					onPositionsChange({ x: touch.clientX, y: touch.clientY })
+				}}
+				onTouchEnd={(event) => {
+					const touch = event.changedTouches[0]!
+					onIsDrawingChange({ value: false, position: { x: touch.clientX, y: touch.clientY } })
+				}}
+				onTouchCancel={(event) => {
+					const touch = event.touches[0]!
+					onIsDrawingChange({ value: false, position: { x: touch.clientX, y: touch.clientY } })
+				}}
 				className={cn(styles.section__canvas)}
-				onPointerDown={(event) => onIsDrawingChange({ value: true, position: { x: event.clientX, y: event.clientY } })}
-				onPointerMove={(event) => onPositionsChange({ x: event.clientX, y: event.clientY })}
-				onPointerUp={(event) => onIsDrawingChange({ value: false, position: { x: event.clientX, y: event.clientY } })}
-				onPointerLeave={(event) =>
-					onIsDrawingChange({ value: false, position: { x: event.clientX, y: event.clientY } })
-				}
+				onMouseDown={(event) => onIsDrawingChange({ value: true, position: { x: event.clientX, y: event.clientY } })}
+				onMouseMove={(event) => onPositionsChange({ x: event.clientX, y: event.clientY })}
+				onMouseUp={(event) => onIsDrawingChange({ value: false, position: { x: event.clientX, y: event.clientY } })}
+				onMouseLeave={(event) => onIsDrawingChange({ value: false, position: { x: event.clientX, y: event.clientY } })}
 			>
 				<g>
 					<circle className={styles.section__canvas__circle} cx='50%' cy='50%' r={model.CENTER_CIRCLE_RADIUS} />
