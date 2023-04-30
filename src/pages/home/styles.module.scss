@@ -3,16 +3,7 @@ html:has(.section__canvas) {
 }
 
 .page {
-	display: flex;
-	flex-direction: column;
-	min-height: 100vh;
-
-	overflow: hidden;
-
-	background: var(--background-color);
-	font-family: var(--font-family);
-	font-size: var(--font-size);
-	color: var(--text-color);
+	height: 100%;
 }
 
 .container {
@@ -24,10 +15,7 @@ html:has(.section__canvas) {
 }
 
 .section {
-	display: flex;
-	flex-direction: column;
-	flex-grow: 1;
-	min-height: 0;
+	height: 100%;
 
 	position: relative;
 }
