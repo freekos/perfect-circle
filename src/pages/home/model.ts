@@ -151,6 +151,7 @@ function getPositionResult<T extends Position>(args: { position: T; center: T; i
 	const accuracy = calculatePositionAccuracy({ position, center, idealRadius })
 	const quarter = calculateQuarter({ position, center })
 	const radius = calculateDistance({ position, center })
+	console.log(quarter)
 
 	return { ...position, accuracy, createAt, quarter, radius }
 }
@@ -226,26 +227,17 @@ function checkIsCircleComplete<T extends Position>(args: { positions: T[]; cente
 		return quarter === 4
 	})
 
-	return (
-		hasFirstQuarter &&
-		hasSecondQuarter &&
-		hasThirdQuarter &&
-		hasFourthQuarter &&
-		firstQuarter === lastQuarter &&
-		firstPosition!.x <= lastPosition!.x &&
-		firstPosition!.y <= lastPosition!.y
-	)
+	return hasFirstQuarter && hasSecondQuarter && hasThirdQuarter && hasFourthQuarter && firstQuarter === lastQuarter
 }
 
 function calculateQuarter<T extends Position>(args: { position: T; center: T }): number {
 	const { position, center } = args
 
 	const angle = calculateAngle({ position, center })
-	// console.log(angle)
-	if (angle > 0 && angle < 90) return 1
-	if (angle > 90 && angle < 180) return 2
-	if (angle > 180 || angle < 270) return 3
-	if (angle > 270 && angle < 360) return 4
+	if (angle < 0 && angle > -90) return 1
+	if (angle < -90 && angle > -180) return 2
+	if (angle < 180 && angle > 90) return 3
+	if (angle < 90 && angle > 0) return 4
 
 	return 0
 }
@@ -253,10 +245,10 @@ function calculateQuarter<T extends Position>(args: { position: T; center: T }):
 function calculateAngle<T extends Position>(args: { position: T; center: T }): number {
 	const { position, center } = args
 
-	const deltaX = position.x - center.x
-	const deltaY = position.y - center.y
-	const angle = (Math.atan2(deltaY, deltaX) * 180) / Math.PI
+	const dx = position.x - center.x
+	const dy = position.y - center.y
 
+	const angle = Math.atan2(dy, dx) * (180 / Math.PI)
 	return angle
 }
 
