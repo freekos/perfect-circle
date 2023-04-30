@@ -13,18 +13,23 @@ export function HomePage() {
 		return () => {
 			onUnmount()
 		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [])
 
 	return (
-		<main className={cn(styles.page)}>
-			<Section />
-		</main>
+		<>
+			<header />
+			<main className={cn(styles.page)}>
+				<Section />
+			</main>
+			<footer />
+		</>
 	)
 }
 
 function Section() {
 	const [onIsDrawingChange] = useUnit([model.$$svgCanvas.isDrawingChanged])
-	const [positionsDetailed, onPositionsChange] = useUnit([model.$positionsDetails, model.$$svgCanvas.positionChanged])
+	const [positionsResults, onPositionsChange] = useUnit([model.$positionsResults, model.$$svgCanvas.positionChanged])
 	const [circleAccuracy, circleError] = useUnit([model.$circleAccuracy, model.$circleError])
 
 	return (
@@ -59,35 +64,23 @@ function Section() {
 					<circle className={styles.section__canvas__circle} cx='50%' cy='50%' r={model.CENTER_CIRCLE_RADIUS} />
 				</g>
 				<g>
-					{/* <path
-						d={positions
-							.map((position, index) => {
-								if (index === 0) return `M${position.x}, ${position.y}`
-								return `L${position.x}, ${position.y}`
-							})
-							.join(' ')}
-						fill='none'
-						stroke={getColor(circleAccuracy)}
-						strokeWidth='8.005082969716458px'
-						strokeLinecap='round'
-						strokeLinejoin='round'
-						strokeDashoffset='0'
-						strokeMiterlimit='4'
-					/> */}
+					{positionsResults.map((_, index) => {
+						const prevPositionResult = positionsResults[index - 1]
+						const positionResult = positionsResults[index]
+						const nextPositionResult = positionsResults[index + 1]
 
-					{positionsDetailed.map((positionDetailed, index) => {
-						if (!positionDetailed || !positionsDetailed[index - 1] || !positionsDetailed[index + 1]) return null
+						if (!prevPositionResult || !positionResult || !nextPositionResult) return null
 
 						return (
 							<Fragment key={index}>
 								<path
 									d={positionsToPathWithCubicCurveControlPoints([
-										positionsDetailed[index - 1]!.position,
-										positionsDetailed[index]!.position,
-										positionsDetailed[index + 1]!.position,
+										{ x: prevPositionResult.x, y: prevPositionResult.y },
+										{ x: positionResult.x, y: positionResult.y },
+										{ x: nextPositionResult.x, y: nextPositionResult.y },
 									])}
 									fill='none'
-									stroke={getLineColor(positionDetailed.accuracy)}
+									stroke={getLineColor(positionResult.accuracy)}
 									strokeWidth='8.005082969716458px'
 									strokeLinecap='round'
 									strokeLinejoin='round'
