@@ -6,12 +6,14 @@ import { createSvgCanvas, type Position } from '~src/entities/svg_canvas'
 
 class CircleError extends Error {}
 
-interface PositionDetail {
-	position: Position
-	accuracy: number
+interface PositionAnalyze {
 	createAt: number
+	accuracy: number
 	quarter: number
+	radius: number
 }
+
+type PositionResult = Position & PositionAnalyze
 // Consts
 export const POSITION_TIMER_TIMEOUT = 1
 export const POSITION_CHANGE_DELAY = 30
@@ -24,8 +26,8 @@ export const CENTER_CIRCLE_RADIUS = 8.5
 
 // Effects
 const circlePositionsAnalyzeFx = createEffect<
-	{ positionsDetails: Array<PositionDetail>; newPosition: Position; radius: number },
-	PositionDetail
+	{ positionsResults: Array<PositionResult>; newPositionResult: PositionResult; idealRadius: number },
+	PositionResult
 >()
 
 // Factories
@@ -34,17 +36,16 @@ export const $$pageEvent = createPageEvent<void, void>()
 export const $$svgCanvas = createSvgCanvas()
 
 // Stores
-export const $circleRadius = createStore<number>(0)
+export const $idealRadius = createStore<number>(0)
 export const $circleError = createStore<string>('')
 
-export const $positionsDetails = createStore<Array<PositionDetail>>([])
+export const $positionsResults = createStore<Array<PositionResult>>([])
 export const $positionTimer = createStore<number>(0)
 
-export const $circleAccuracy = $positionsDetails.map((positionsDetails) => {
-	if (positionsDetails.length === 0) return 0
-	const positions = positionsDetails.map((detail) => detail.position)
+export const $circleAccuracy = $positionsResults.map((positionsResults) => {
+	if (positionsResults.length === 0) return 0
 	const center = getCenter()
-	return calculateCirclePerfect({ positions, center })
+	return calculateCirclePerfect({ positions: positionsResults, center })
 })
 
 // Logics
@@ -53,104 +54,68 @@ sample({
 	filter: ({ value }) => value,
 	fn: ({ position }) => {
 		const center = getCenter()
-		const circleRadius = calculateDistance({ position, center })
-		return circleRadius
+		const idealRadius = calculateDistance({ position, center })
+		return idealRadius
 	},
-	target: [$circleRadius, $circleError.reinit!, $positionsDetails.reinit!, $positionTimer.reinit!],
+	target: [$idealRadius, $circleError.reinit!, $positionsResults.reinit!, $positionTimer.reinit!],
 })
 
-const circleWillEnd = sample({
+const circleWillComplete = sample({
 	clock: $$svgCanvas.positionChanged,
 	source: { isDrawing: $$svgCanvas.$isDrawing, positions: $$svgCanvas.$positions },
 	filter: ({ isDrawing, positions }, newPosition) => {
 		if (!isDrawing) return false
 		if (positions.length < 3) return false
 		const center = getCenter()
-		const isCircle = checkIsCircleEnd({ positions: [...positions, newPosition], center })
-		return isCircle
+		const isCircleComplete = checkIsCircleComplete({ positions: [...positions, newPosition], center })
+		return isCircleComplete
 	},
 })
 
 sample({
-	clock: circleWillEnd,
+	clock: circleWillComplete,
 	target: [$$svgCanvas.$isDrawing.reinit!],
 })
 
 const { tick: positionTimerTick } = interval({
 	timeout: POSITION_TIMER_TIMEOUT,
 	start: $$svgCanvas.positionChanged,
-	stop: circleWillEnd,
+	stop: circleWillComplete,
 })
 
 $positionTimer.on(positionTimerTick, (timer) => timer + 1)
 
 sample({
 	clock: $$svgCanvas.positionChanged,
-	source: { positionsDetails: $positionsDetails, radius: $circleRadius },
+	source: { positionsResults: $positionsResults, idealRadius: $idealRadius },
 	filter: $$svgCanvas.$isDrawing,
-	fn: ({ positionsDetails, radius }, newPosition) => ({ positionsDetails, radius, newPosition }),
+	fn: ({ positionsResults, idealRadius }, newPosition) => {
+		const center = getCenter()
+		const newPositionResult = getPositionResult({ position: newPosition, center, idealRadius })
+		return { positionsResults, idealRadius, newPositionResult }
+	},
 	target: circlePositionsAnalyzeFx,
 })
 
-circlePositionsAnalyzeFx.use(({ positionsDetails, radius, newPosition }) => {
+circlePositionsAnalyzeFx.use(({ positionsResults, idealRadius, newPositionResult }) => {
 	const center = getCenter()
-	const positions = positionsDetails.map((detail) => detail.position)
-	const newPositionDetail = getPositionDetail({ position: newPosition, center, radius })
 
-	const newPositionRadius = calculateDistance({ position: newPosition, center })
-	if (newPositionRadius < CIRCLE_MIN_RADIUS) {
+	if (newPositionResult.radius < CIRCLE_MIN_RADIUS) {
 		throw new CircleError('Too small')
 	}
 
-	const isCircle = checkIsCircle({ positions: [...positions, newPosition], center })
+	const isCircle = checkIsCircle({ positions: [...positionsResults, newPositionResult], center })
 	if (!isCircle) {
 		throw new CircleError('Not circle')
 	}
 
-	const lastPositionDetail = positionsDetails[positionsDetails.length - 1]
-	if (lastPositionDetail && newPositionDetail.createAt - lastPositionDetail.createAt > POSITION_CHANGE_DELAY) {
+	const lastPositionResult = positionsResults[positionsResults.length - 1]
+	if (lastPositionResult && newPositionResult.createAt - lastPositionResult.createAt > POSITION_CHANGE_DELAY) {
 		throw new CircleError('Too slow')
 	}
 
-	return newPositionDetail
+	return newPositionResult
 })
-
-/*
-const positionsDetailsWillChange = sample({
-	clock: $$svgCanvas.positionChanged,
-	source: {
-		isDrawing: $$svgCanvas.$isDrawing,
-		positionsDetails: $positionsDetails,
-		circleRadius: $circleRadius,
-	},
-	filter: ({ isDrawing }) => isDrawing,
-	fn: ({ positionsDetails, circleRadius }, newPosition) => {
-		const center = getCenter()
-		const newPositionDetail = getPositionDetail({
-			position: newPosition,
-			center,
-			radius: circleRadius,
-		})
-
-		const positions = positionsDetails.map((detail) => detail.position)
-		const isCircle = checkIsCircle({ positions: [...positions, newPosition], center })
-		if (!isCircle) return { error: 'Not a circle', newPositionDetail }
-
-		const lastPositionDetail = positionsDetails[positionsDetails.length - 1]
-
-		if (lastPositionDetail) {
-			console.log(newPositionDetail.createAt - lastPositionDetail.createAt)
-			if (newPositionDetail.createAt - lastPositionDetail.createAt > POSITION_CHANGE_DELAY)
-				return { error: 'Too slow', newPositionDetail }
-		}
-
-		const newPositionRadius = calculateDistance({ position: newPosition, center })
-		if (newPositionRadius < CIRCLE_MIN_RADIUS) return { error: 'Too small', newPositionDetail }
-
-		return { error: '', newPositionDetail }
-	},
-})
- */
 
 $circleError.on(circlePositionsAnalyzeFx.fail, (_, { error }) => {
 	if (error instanceof CircleError) return error.message
@@ -161,13 +126,13 @@ sample({
 	clock: circlePositionsAnalyzeFx.fail,
 	target: [$$svgCanvas.$isDrawing.reinit!],
 })
-$positionsDetails.on(circlePositionsAnalyzeFx.doneData, (positionsDetails, newPositionDetail) => {
-	return [...positionsDetails, newPositionDetail]
+$positionsResults.on(circlePositionsAnalyzeFx.doneData, (positionsResults, newPositionResult) => {
+	return [...positionsResults, newPositionResult]
 })
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-function calculateCirclePerfect(args: { positions: Position[]; center: Position }): number {
+function calculateCirclePerfect<T extends Position>(args: { positions: T[]; center: T }): number {
 	const { positions, center } = args
 
 	const distances = positions.map((position) => calculateDistance({ position, center }))
@@ -179,18 +144,19 @@ function calculateCirclePerfect(args: { positions: Position[]; center: Position 
 	return Math.max(0, 100 - deviationPercent)
 }
 
-function getPositionDetail(args: { position: Position; center: Position; radius: number }) {
-	const { position, center, radius } = args
+function getPositionResult<T extends Position>(args: { position: T; center: T; idealRadius: number }): PositionResult {
+	const { position, center, idealRadius } = args
 
 	const createAt = Date.now()
-	const accuracy = calculatePositionAccuracy({ position, center, radius })
+	const accuracy = calculatePositionAccuracy({ position, center, idealRadius })
 	const quarter = calculateQuarter({ position, center })
+	const radius = calculateDistance({ position, center })
 
-	return { position, accuracy, createAt, quarter } as PositionDetail
+	return { ...position, accuracy, createAt, quarter, radius }
 }
 
-function checkIsCircle(args: { positions: Position[]; center: Position }): boolean {
-	const { positions, center } = args
+function checkIsCircle<T extends Position>(args: { positions: T[]; center: T }): boolean {
+	const { positions } = args
 
 	const MIN_ANGLE_DIFF = Math.PI * 0.95
 	const MAX_ANGLE_DIFF = Math.PI * 1.05
@@ -213,17 +179,17 @@ function checkIsCircle(args: { positions: Position[]; center: Position }): boole
 	return !isCircle
 }
 
-function calculatePositionAccuracy(args: { position: Position; center: Position; radius: number }): number {
-	const { position, center, radius } = args
+function calculatePositionAccuracy<T extends Position>(args: { position: T; center: T; idealRadius: number }): number {
+	const { position, center, idealRadius } = args
 
 	const distance = calculateDistance({ position, center })
-	const errorDistance = Math.abs(distance - radius)
-	const accuracy = Math.max(0, (1 - errorDistance / radius) * 100)
+	const errorDistance = Math.abs(distance - idealRadius)
+	const accuracy = Math.max(0, (1 - errorDistance / idealRadius) * 100)
 
 	return accuracy
 }
 
-function calculateDistance(args: { position: Position; center: Position }): number {
+function calculateDistance<T extends Position>(args: { position: T; center: T }): number {
 	const { position, center } = args
 
 	const dx = position.x - center.x
@@ -232,7 +198,7 @@ function calculateDistance(args: { position: Position; center: Position }): numb
 	return Math.sqrt(dx * dx + dy * dy)
 }
 
-function checkIsCircleEnd(args: { positions: Position[]; center: Position }): boolean {
+function checkIsCircleComplete<T extends Position>(args: { positions: T[]; center: T }): boolean {
 	const { positions, center } = args
 
 	if (positions.length < 3) return false
@@ -271,7 +237,7 @@ function checkIsCircleEnd(args: { positions: Position[]; center: Position }): bo
 	)
 }
 
-function calculateQuarter(args: { position: Position; center: Position }): number {
+function calculateQuarter<T extends Position>(args: { position: T; center: T }): number {
 	const { position, center } = args
 
 	const angle = calculateAngle({ position, center })
@@ -284,7 +250,7 @@ function calculateQuarter(args: { position: Position; center: Position }): numbe
 	return 0
 }
 
-function calculateAngle(args: { position: Position; center: Position }): number {
+function calculateAngle<T extends Position>(args: { position: T; center: T }): number {
 	const { position, center } = args
 
 	const deltaX = position.x - center.x
