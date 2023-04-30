@@ -5,7 +5,8 @@
 	src: local('DotGothic16Regular'), url('../shared/assets/fonts/DotGothic16-Regular.ttf') format('truetype');
 }
 
-body {
+body,
+.app {
 	background: var(--background-color);
 	font-family: var(--font-family);
 	font-size: var(--font-size);
@@ -13,5 +14,11 @@ body {
 }
 
 .app {
+	display: grid;
+	grid-template-rows: auto 1fr auto;
+
+	width: 100%;
 	height: 100%;
+	max-width: 100vw;
+	min-height: 100vh;
 }
