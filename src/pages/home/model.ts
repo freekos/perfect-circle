@@ -1,8 +1,10 @@
-import { createStore, sample } from 'effector'
+import { createEffect, createStore, sample } from 'effector'
 import { interval } from 'patronum'
 
 import { createPageEvent } from '~src/entities/page_event'
 import { createSvgCanvas, type Position } from '~src/entities/svg_canvas'
+
+class CircleError extends Error {}
 
 interface PositionDetail {
 	position: Position
@@ -19,6 +21,12 @@ export const CIRCLE_MIN_RADIUS = 25
 export const CENTER_CIRCLE_RADIUS = 8.5
 
 // Events
+
+// Effects
+const circlePositionsAnalyzeFx = createEffect<
+	{ positionsDetails: Array<PositionDetail>; newPosition: Position; radius: number },
+	PositionDetail
+>()
 
 // Factories
 export const $$pageEvent = createPageEvent<void, void>()
@@ -40,7 +48,6 @@ export const $circleAccuracy = $positionsDetails.map((positionsDetails) => {
 })
 
 // Logics
-
 sample({
 	clock: $$svgCanvas.isDrawingChanged,
 	filter: ({ value }) => value,
@@ -77,6 +84,38 @@ const { tick: positionTimerTick } = interval({
 
 $positionTimer.on(positionTimerTick, (timer) => timer + 1)
 
+sample({
+	clock: $$svgCanvas.positionChanged,
+	source: { positionsDetails: $positionsDetails, radius: $circleRadius },
+	filter: $$svgCanvas.$isDrawing,
+	fn: ({ positionsDetails, radius }, newPosition) => ({ positionsDetails, radius, newPosition }),
+	target: circlePositionsAnalyzeFx,
+})
+
+circlePositionsAnalyzeFx.use(({ positionsDetails, radius, newPosition }) => {
+	const center = getCenter()
+	const positions = positionsDetails.map((detail) => detail.position)
+	const newPositionDetail = getPositionDetail({ position: newPosition, center, radius })
+
+	const newPositionRadius = calculateDistance({ position: newPosition, center })
+	if (newPositionRadius < CIRCLE_MIN_RADIUS) {
+		throw new CircleError('Too small')
+	}
+
+	const isCircle = checkIsCircle({ positions: [...positions, newPosition], center })
+	if (!isCircle) {
+		throw new CircleError('Not circle')
+	}
+
+	const lastPositionDetail = positionsDetails[positionsDetails.length - 1]
+	if (lastPositionDetail && newPositionDetail.createAt - lastPositionDetail.createAt > POSITION_CHANGE_DELAY) {
+		throw new CircleError('Too slow')
+	}
+
+	return newPositionDetail
+})
+
+/*
 const positionsDetailsWillChange = sample({
 	clock: $$svgCanvas.positionChanged,
 	source: {
@@ -111,16 +150,18 @@ const positionsDetailsWillChange = sample({
 		return { error: '', newPositionDetail }
 	},
 })
+ */
 
-$circleError.on(positionsDetailsWillChange, (_, { error }) => error)
+$circleError.on(circlePositionsAnalyzeFx.fail, (_, { error }) => {
+	if (error instanceof CircleError) return error.message
+	return undefined
+})
 
 sample({
-	clock: positionsDetailsWillChange,
-	filter: ({ error }) => error !== '',
+	clock: circlePositionsAnalyzeFx.fail,
 	target: [$$svgCanvas.$isDrawing.reinit!],
 })
-$positionsDetails.on(positionsDetailsWillChange, (positionsDetails, { error, newPositionDetail }) => {
-	if (error !== '') return positionsDetails
+$positionsDetails.on(circlePositionsAnalyzeFx.doneData, (positionsDetails, newPositionDetail) => {
 	return [...positionsDetails, newPositionDetail]
 })
 
