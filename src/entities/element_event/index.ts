@@ -1,0 +1,1 @@
+export { createElementEvent } from './model'

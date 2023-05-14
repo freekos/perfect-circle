@@ -1,10 +1,12 @@
-import { createEffect, createStore, sample } from 'effector'
-import { interval } from 'patronum'
+import { combine, createEffect, createEvent, createStore, sample } from 'effector'
+import { interval, not } from 'patronum'
 
-import { createPageEvent } from '~src/entities/page_event'
-import { createSvgCanvas, type Position } from '~src/entities/svg_canvas'
+import { createElementEvent } from '~src/entities/element_event'
 
-class CircleError extends Error {}
+interface Position {
+	x: number
+	y: number
+}
 
 interface PositionAnalyze {
 	createAt: number
@@ -14,92 +16,130 @@ interface PositionAnalyze {
 }
 
 type PositionResult = Position & PositionAnalyze
+
+export enum GameStatus {
+	Idle,
+	Started,
+	Finished,
+}
+
+class CircleError extends Error {}
+
 // Consts
-export const POSITION_TIMER_TIMEOUT = 1
-export const POSITION_CHANGE_DELAY = 30
+export const POSITION_TIMER_TIMEOUT = 5
+export const POSITION_CHANGE_DELAY = 40
 
 export const CIRCLE_MIN_RADIUS = 25
 
 export const CENTER_CIRCLE_RADIUS = 8.5
 
 // Events
+export const gameStarted = createEvent<void>()
+
+export const drawingStarted = createEvent<{ position: Position }>()
+export const drawingEnded = createEvent<{ position: Position }>()
+
+export const positionChanged = createEvent<Position>()
 
 // Effects
 const circlePositionsAnalyzeFx = createEffect<
-	{ positionsResults: Array<PositionResult>; newPositionResult: PositionResult; idealRadius: number },
+	{
+		positionsResults: Array<PositionResult>
+		newPositionResult: PositionResult
+		circleRadius: number
+		center: Position
+	},
 	PositionResult
 >()
 
 // Factories
-export const $$pageEvent = createPageEvent<void, void>()
-
-export const $$svgCanvas = createSvgCanvas()
+export const $$pageEvent = createElementEvent<void, void>()
+export const $$svgEvent = createElementEvent<SVGSVGElement, void>()
 
 // Stores
-export const $idealRadius = createStore<number>(0)
+export const $gameStatus = createStore<GameStatus>(GameStatus.Idle)
+export const $svgCenter = createStore<Position | null>(null)
+
+export const $isDrawing = createStore<boolean>(false)
+export const $positions = createStore<Array<Position>>([])
+
+export const $circleRadius = createStore<number>(0)
 export const $circleError = createStore<string>('')
 
 export const $positionsResults = createStore<Array<PositionResult>>([])
-export const $positionTimer = createStore<number>(0)
+export const $positionChangeTimer = createStore<number>(0)
 
-export const $circleAccuracy = $positionsResults.map((positionsResults) => {
-	if (positionsResults.length === 0) return 0
-	const center = getCenter()
+export const $circleAccuracy = combine($positionsResults, $svgCenter, (positionsResults, center) => {
+	if (positionsResults.length === 0 || !center) return 0
 	return calculateCirclePerfect({ positions: positionsResults, center })
 })
 
 // Logics
+$svgCenter.on($$svgEvent.mounted, (_, svg) => {
+	return getSvgCenter(svg)
+})
+
+$gameStatus.on(gameStarted, () => GameStatus.Started)
+$isDrawing.on(drawingStarted, () => true)
+
 sample({
-	clock: $$svgCanvas.isDrawingChanged,
-	filter: ({ value }) => value,
-	fn: ({ position }) => {
-		const center = getCenter()
-		const idealRadius = calculateDistance({ position, center })
-		return idealRadius
+	clock: drawingStarted,
+	target: [
+		$circleError.reinit!,
+		$positions.reinit!,
+		$positionsResults.reinit!,
+		$positionChangeTimer.reinit!,
+		$circleRadius.reinit!,
+	],
+})
+
+sample({
+	clock: drawingStarted,
+	source: $svgCenter,
+	filter: (center: Position | null): center is Position => center !== null,
+	fn: (center, { position }) => {
+		const circleRadius = calculateDistance({ position, center })
+
+		return circleRadius
 	},
-	target: [$idealRadius, $circleError.reinit!, $positionsResults.reinit!, $positionTimer.reinit!],
+	target: $circleRadius,
 })
 
-const circleWillComplete = sample({
-	clock: $$svgCanvas.positionChanged,
-	source: { isDrawing: $$svgCanvas.$isDrawing, positions: $$svgCanvas.$positions },
-	filter: ({ isDrawing, positions }, newPosition) => {
-		if (!isDrawing) return false
-		if (positions.length < 3) return false
-		const center = getCenter()
-		const isCircleComplete = checkIsCircleComplete({ positions: [...positions, newPosition], center })
-		return isCircleComplete
+sample({
+	clock: positionChanged,
+	filter: $isDrawing,
+	source: $positions,
+	fn: (positions, newPosition) => [...positions, newPosition],
+	target: $positions,
+})
+
+sample({
+	clock: positionChanged,
+	source: {
+		positionsResults: $positionsResults,
+		circleRadius: $circleRadius,
+		isDrawing: $isDrawing,
+		center: $svgCenter,
 	},
-})
-
-sample({
-	clock: circleWillComplete,
-	target: [$$svgCanvas.$isDrawing.reinit!],
-})
-
-const { tick: positionTimerTick } = interval({
-	timeout: POSITION_TIMER_TIMEOUT,
-	start: $$svgCanvas.positionChanged,
-	stop: circleWillComplete,
-})
-
-$positionTimer.on(positionTimerTick, (timer) => timer + 1)
-
-sample({
-	clock: $$svgCanvas.positionChanged,
-	source: { positionsResults: $positionsResults, idealRadius: $idealRadius },
-	filter: $$svgCanvas.$isDrawing,
-	fn: ({ positionsResults, idealRadius }, newPosition) => {
-		const center = getCenter()
-		const newPositionResult = getPositionResult({ position: newPosition, center, idealRadius })
-		return { positionsResults, idealRadius, newPositionResult }
+	filter: (source: {
+		positionsResults: Array<PositionResult>
+		circleRadius: number
+		isDrawing: boolean
+		center: Position | null
+	}): source is {
+		positionsResults: Array<PositionResult>
+		circleRadius: number
+		isDrawing: boolean
+		center: Position
+	} => source.isDrawing && source.center !== null,
+	fn: ({ positionsResults, circleRadius, center }, newPosition) => {
+		const newPositionResult = getPositionResult({ position: newPosition, center, circleRadius })
+		return { positionsResults, newPositionResult, circleRadius, center }
 	},
 	target: circlePositionsAnalyzeFx,
 })
 
-circlePositionsAnalyzeFx.use(({ positionsResults, idealRadius, newPositionResult }) => {
-	const center = getCenter()
-
+circlePositionsAnalyzeFx.use(({ positionsResults, newPositionResult, center }) => {
 	if (newPositionResult.radius < CIRCLE_MIN_RADIUS) {
 		throw new CircleError('Too small')
 	}
@@ -119,15 +159,64 @@ circlePositionsAnalyzeFx.use(({ positionsResults, idealRadius, newPositionResult
 
 $circleError.on(circlePositionsAnalyzeFx.fail, (_, { error }) => {
 	if (error instanceof CircleError) return error.message
+	if (error instanceof Error) return error.message
 	return undefined
 })
 
 sample({
 	clock: circlePositionsAnalyzeFx.fail,
-	target: [$$svgCanvas.$isDrawing.reinit!],
+	target: $isDrawing.reinit!,
 })
+
 $positionsResults.on(circlePositionsAnalyzeFx.doneData, (positionsResults, newPositionResult) => {
 	return [...positionsResults, newPositionResult]
+})
+
+const circleWillComplete = sample({
+	clock: positionChanged,
+	source: { isDrawing: $isDrawing, positions: $positions, center: $svgCenter },
+	filter: ({ isDrawing, positions, center }, newPosition) => {
+		if (!isDrawing) return false
+		if (!center) return false
+		if (positions.length < 3) return false
+		const isCircleComplete = checkIsCircleComplete({ positions: [...positions, newPosition], center })
+
+		return isCircleComplete
+	},
+})
+
+sample({
+	clock: circleWillComplete,
+	target: $isDrawing.reinit!,
+})
+
+const { tick: positionChangeTimerTick } = interval({
+	timeout: POSITION_TIMER_TIMEOUT,
+	start: positionChanged,
+	stop: circleWillComplete,
+})
+
+$positionChangeTimer.on(positionChangeTimerTick, (timer) => timer + 1)
+
+sample({
+	clock: drawingEnded,
+	source: { positionsResults: $positionsResults, center: $svgCenter },
+	filter: ({ positionsResults, center }) => {
+		if (!center) return false
+		const isCircleComplete = checkIsCircleComplete({ positions: positionsResults, center })
+
+		return !isCircleComplete
+	},
+	fn: () => 'Circle is not completed',
+	target: $circleError,
+})
+
+$isDrawing.on(drawingEnded, () => false)
+sample({
+	clock: $isDrawing,
+	filter: not($isDrawing),
+	fn: () => GameStatus.Finished,
+	target: $gameStatus,
 })
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -144,14 +233,13 @@ function calculateCirclePerfect<T extends Position>(args: { positions: T[]; cent
 	return Math.max(0, 100 - deviationPercent)
 }
 
-function getPositionResult<T extends Position>(args: { position: T; center: T; idealRadius: number }): PositionResult {
-	const { position, center, idealRadius } = args
+function getPositionResult<T extends Position>(args: { position: T; center: T; circleRadius: number }): PositionResult {
+	const { position, center, circleRadius } = args
 
 	const createAt = Date.now()
-	const accuracy = calculatePositionAccuracy({ position, center, idealRadius })
+	const accuracy = calculatePositionAccuracy({ position, center, circleRadius })
 	const quarter = calculateQuarter({ position, center })
 	const radius = calculateDistance({ position, center })
-	console.log(quarter)
 
 	return { ...position, accuracy, createAt, quarter, radius }
 }
@@ -180,12 +268,12 @@ function checkIsCircle<T extends Position>(args: { positions: T[]; center: T }):
 	return !isCircle
 }
 
-function calculatePositionAccuracy<T extends Position>(args: { position: T; center: T; idealRadius: number }): number {
-	const { position, center, idealRadius } = args
+function calculatePositionAccuracy<T extends Position>(args: { position: T; center: T; circleRadius: number }): number {
+	const { position, center, circleRadius } = args
 
 	const distance = calculateDistance({ position, center })
-	const errorDistance = Math.abs(distance - idealRadius)
-	const accuracy = Math.max(0, (1 - errorDistance / idealRadius) * 100)
+	const errorDistance = Math.abs(distance - circleRadius)
+	const accuracy = Math.max(0, (1 - errorDistance / circleRadius) * 100)
 
 	return accuracy
 }
@@ -226,6 +314,7 @@ function checkIsCircleComplete<T extends Position>(args: { positions: T[]; cente
 		const quarter = calculateQuarter({ position, center })
 		return quarter === 4
 	})
+	// console.log(positions)
 
 	return hasFirstQuarter && hasSecondQuarter && hasThirdQuarter && hasFourthQuarter && firstQuarter === lastQuarter
 }
@@ -234,6 +323,7 @@ function calculateQuarter<T extends Position>(args: { position: T; center: T }):
 	const { position, center } = args
 
 	const angle = calculateAngle({ position, center })
+
 	if (angle < 0 && angle > -90) return 1
 	if (angle < -90 && angle > -180) return 2
 	if (angle < 180 && angle > 90) return 3
@@ -252,6 +342,10 @@ function calculateAngle<T extends Position>(args: { position: T; center: T }): n
 	return angle
 }
 
-function getCenter(): Position {
-	return { x: window.innerWidth / 2, y: window.innerHeight / 2 }
+function getSvgCenter(svg: SVGSVGElement): Position {
+	const point = svg.createSVGPoint()
+	point.x = window.innerWidth / 2
+	point.y = window.innerHeight / 2
+	const { x, y } = point.matrixTransform(svg.getScreenCTM()?.inverse())
+	return { x, y }
 }

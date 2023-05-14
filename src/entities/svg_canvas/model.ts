@@ -5,34 +5,34 @@ export interface Position {
 	y: number
 }
 
-export function createSvgCanvas() {
-	const isDrawingChanged = createEvent<{ value: boolean; position: Position }>()
-	const positionChanged = createEvent<Position>()
+// export function () {
+// 	const isDrawingChanged = createEvent<{ value: boolean; position: Position }>()
+// 	const positionChanged = createEvent<Position>()
 
-	const $isDrawing = createStore<boolean>(false)
+// 	const $isDrawing = createStore<boolean>(false)
 
-	const $positions = createStore<Array<Position>>([])
+// 	const $positions = createStore<Array<Position>>([])
 
-	$isDrawing.on(isDrawingChanged, (_, { value }) => value)
+// 	$isDrawing.on(isDrawingChanged, (_, { value }) => value)
 
-	sample({
-		clock: isDrawingChanged,
-		filter: $isDrawing,
-		target: $positions.reinit!,
-	})
+// 	sample({
+// 		clock: isDrawingChanged,
+// 		filter: $isDrawing,
+// 		target: $positions.reinit!,
+// 	})
 
-	sample({
-		clock: positionChanged,
-		source: $positions,
-		filter: $isDrawing,
-		fn: (positions, newPosition) => [...positions, newPosition],
-		target: $positions,
-	})
+// 	sample({
+// 		clock: positionChanged,
+// 		source: $positions,
+// 		filter: $isDrawing,
+// 		fn: (positions, newPosition) => [...positions, newPosition],
+// 		target: $positions,
+// 	})
 
-	return {
-		isDrawingChanged,
-		positionChanged,
-		$isDrawing,
-		$positions,
-	}
-}
+// 	return {
+// 		isDrawingChanged,
+// 		positionChanged,
+// 		$isDrawing,
+// 		$positions,
+// 	}
+// }
