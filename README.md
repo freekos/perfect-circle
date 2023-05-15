@@ -1,6 +1,7 @@
 # perfect_circle
 
-## Deploy Version - https://perfect-circle.netlify.app/
+## Main deploy version - https://perfect-circle.netlify.app/
+## Dev deploy version - https://dev--perfect-circle.netlify.app/
 
 ## Start
 	npm install
